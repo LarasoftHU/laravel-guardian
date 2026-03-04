@@ -6,6 +6,7 @@ namespace Larasofthu\LaravelGuardian;
 
 use Larasofthu\LaravelGuardian\Commands\ScanFileIntegrityCommand;
 use Larasofthu\LaravelGuardian\Services\DiskScanService;
+use Larasofthu\LaravelGuardian\Services\FileMetadataService;
 use Larasofthu\LaravelGuardian\Services\GitDiffService;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -25,5 +26,6 @@ class FileIntegrityServiceProvider extends PackageServiceProvider
     {
         $this->app->singleton(GitDiffService::class);
         $this->app->singleton(DiskScanService::class);
+        $this->app->singleton(FileMetadataService::class);
     }
 }

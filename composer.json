@@ -1,6 +1,6 @@
 {
     "name": "larasofthu/laravel-guardian",
-    "version": "1.0.63",
+    "version": "1.0.64",
     "description": "Laravel package for file integrity checking against Git state",
     "keywords": [
         "laravel",

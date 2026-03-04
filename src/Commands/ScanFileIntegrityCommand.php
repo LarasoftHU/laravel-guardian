@@ -7,7 +7,9 @@ namespace Larasofthu\LaravelGuardian\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Larasofthu\LaravelGuardian\Services\DiskScanService;
+use Larasofthu\LaravelGuardian\Services\FileMetadataService;
 use Larasofthu\LaravelGuardian\Services\GitDiffService;
 
 class ScanFileIntegrityCommand extends Command
@@ -25,7 +27,8 @@ class ScanFileIntegrityCommand extends Command
 
     public function __construct(
         private readonly GitDiffService $gitDiffService,
-        private readonly DiskScanService $diskScanService
+        private readonly DiskScanService $diskScanService,
+        private readonly FileMetadataService $fileMetadataService
     ) {
         parent::__construct();
     }
@@ -124,6 +127,7 @@ class ScanFileIntegrityCommand extends Command
 
         $shouldMail = ($hasChanges || $hasDiskFindings) && config('file-integrity.report.mail', false);
         if ($shouldMail) {
+            $this->enrichReportWithFileMetadata($report, $basePath, $disksForReport, $scanPublicPath);
             $this->sendMailReport($report);
         }
 
@@ -345,6 +349,71 @@ class ScanFileIntegrityCommand extends Command
 
         if ($summary['total'] === 0 && ! ($diskScan['has_findings'] ?? false)) {
             $this->comment('No changes or security findings detected.');
+        }
+    }
+
+    /**
+     * Enrich report with file metadata (created_at, modified_at, owner, group) for email display.
+     *
+     * @param  array<string, mixed>  $report
+     * @param  string[]  $disksForReport
+     */
+    private function enrichReportWithFileMetadata(array &$report, string $basePath, array $disksForReport, bool $scanPublicPath): void
+    {
+        $report['file_metadata'] = [];
+
+        $addMetadata = function (string $key, string $fullPath) use (&$report): void {
+            $meta = $this->fileMetadataService->getMetadata($fullPath);
+            if ($meta !== null) {
+                $report['file_metadata'][$key] = $meta;
+            }
+        };
+
+        $basePath = rtrim(str_replace('\\', '/', $basePath), '/');
+
+        foreach ($report['changed_files']['added'] ?? [] as $file) {
+            $addMetadata('git:' . $file, $basePath . '/' . str_replace('\\', '/', $file));
+        }
+        foreach ($report['changed_files']['modified'] ?? [] as $file) {
+            $addMetadata('git:' . $file, $basePath . '/' . str_replace('\\', '/', $file));
+        }
+        foreach ($report['changed_files']['untracked'] ?? [] as $file) {
+            $addMetadata('git:' . $file, $basePath . '/' . str_replace('\\', '/', $file));
+        }
+        foreach ($report['changed_files']['renamed'] ?? [] as $pair) {
+            $addMetadata('git:' . $pair['to'], $basePath . '/' . str_replace('\\', '/', $pair['to']));
+        }
+
+        $diskFindings = $report['disk_scan']['findings'] ?? null;
+        if ($diskFindings !== null) {
+            foreach (['suspicious_php', 'malware_patterns', 'dangerous_files', 'suspicious_paths'] as $category) {
+                foreach ($diskFindings[$category] ?? [] as $i => $item) {
+                    $disk = $item['disk'] ?? '';
+                    $path = $item['file'] ?? '';
+                    $fullPath = $this->resolveDiskFilePath($disk, $path, $scanPublicPath);
+                    if ($fullPath !== null) {
+                        $key = 'disk:' . $disk . ':' . $path;
+                        $addMetadata($key, $fullPath);
+                        $report['disk_scan']['findings'][$category][$i]['_metadata'] = $this->fileMetadataService->getMetadata($fullPath);
+                    }
+                }
+            }
+        }
+    }
+
+    private function resolveDiskFilePath(string $disk, string $path, bool $scanPublicPath): ?string
+    {
+        try {
+            if ($disk === 'public' && $scanPublicPath) {
+                $publicPath = base_path('public') . '/' . str_replace('\\', '/', $path);
+                if (is_file($publicPath)) {
+                    return $publicPath;
+                }
+            }
+            $storagePath = Storage::disk($disk)->path($path);
+            return is_file($storagePath) ? $storagePath : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 

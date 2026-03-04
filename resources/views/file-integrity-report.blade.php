@@ -43,6 +43,7 @@
     </div>
     @endif
 
+    @php $fileMetadata = $report['file_metadata'] ?? []; @endphp
     @if($report['summary']['total'] > 0)
     <table>
         <thead>
@@ -50,23 +51,28 @@
                 <th>Status</th>
                 <th>File</th>
                 <th>To</th>
+                <th>Metadata</th>
             </tr>
         </thead>
         <tbody>
             @foreach($report['changed_files']['added'] ?? [] as $file)
-            <tr><td class="status-added">Added</td><td colspan="2">{{ $file }}</td></tr>
+            @php $meta = $fileMetadata['git:' . $file] ?? null; @endphp
+            <tr><td class="status-added">Added</td><td>{{ $file }}</td><td></td><td><small>@if($meta)Created: {{ $meta['created_at'] ?? '-' }} · Modified: {{ $meta['modified_at'] ?? '-' }}@if(($meta['owner'] ?? null)) · Owner: {{ $meta['owner'] }}@endif @if(($meta['group'] ?? null)) · Group: {{ $meta['group'] }}@endif @else - @endif</small></td></tr>
             @endforeach
             @foreach($report['changed_files']['modified'] ?? [] as $file)
-            <tr><td class="status-modified">Modified</td><td colspan="2">{{ $file }}</td></tr>
+            @php $meta = $fileMetadata['git:' . $file] ?? null; @endphp
+            <tr><td class="status-modified">Modified</td><td>{{ $file }}</td><td></td><td><small>@if($meta)Created: {{ $meta['created_at'] ?? '-' }} · Modified: {{ $meta['modified_at'] ?? '-' }}@if(($meta['owner'] ?? null)) · Owner: {{ $meta['owner'] }}@endif @if(($meta['group'] ?? null)) · Group: {{ $meta['group'] }}@endif @else - @endif</small></td></tr>
             @endforeach
             @foreach($report['changed_files']['deleted'] ?? [] as $file)
-            <tr><td class="status-deleted">Deleted</td><td colspan="2">{{ $file }}</td></tr>
+            <tr><td class="status-deleted">Deleted</td><td colspan="3">{{ $file }}</td></tr>
             @endforeach
             @foreach($report['changed_files']['untracked'] ?? [] as $file)
-            <tr><td class="status-untracked">Untracked</td><td colspan="2">{{ $file }}</td></tr>
+            @php $meta = $fileMetadata['git:' . $file] ?? null; @endphp
+            <tr><td class="status-untracked">Untracked</td><td>{{ $file }}</td><td></td><td><small>@if($meta)Created: {{ $meta['created_at'] ?? '-' }} · Modified: {{ $meta['modified_at'] ?? '-' }}@if(($meta['owner'] ?? null)) · Owner: {{ $meta['owner'] }}@endif @if(($meta['group'] ?? null)) · Group: {{ $meta['group'] }}@endif @else - @endif</small></td></tr>
             @endforeach
             @foreach($report['changed_files']['renamed'] ?? [] as $pair)
-            <tr><td class="status-renamed">Renamed</td><td>{{ $pair['from'] }}</td><td>→ {{ $pair['to'] }}</td></tr>
+            @php $meta = $fileMetadata['git:' . $pair['to']] ?? null; @endphp
+            <tr><td class="status-renamed">Renamed</td><td>{{ $pair['from'] }}</td><td>→ {{ $pair['to'] }}</td><td><small>@if($meta)Created: {{ $meta['created_at'] ?? '-' }} · Modified: {{ $meta['modified_at'] ?? '-' }}@if(($meta['owner'] ?? null)) · Owner: {{ $meta['owner'] }}@endif @if(($meta['group'] ?? null)) · Group: {{ $meta['group'] }}@endif @else - @endif</small></td></tr>
             @endforeach
         </tbody>
     </table>
@@ -80,11 +86,13 @@
                 <th>Disk</th>
                 <th>File</th>
                 <th>Functions</th>
+                <th>Metadata</th>
             </tr>
         </thead>
         <tbody>
             @foreach($report['disk_scan']['findings']['suspicious_php'] as $item)
-            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ implode(', ', $item['functions']) }}</td></tr>
+            @php $meta = $item['_metadata'] ?? null; @endphp
+            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ implode(', ', $item['functions']) }}</td><td><small>@if($meta)Created: {{ $meta['created_at'] ?? '-' }} · Modified: {{ $meta['modified_at'] ?? '-' }}@if(($meta['owner'] ?? null)) · Owner: {{ $meta['owner'] }}@endif @if(($meta['group'] ?? null)) · Group: {{ $meta['group'] }}@endif @else - @endif</small></td></tr>
             @endforeach
         </tbody>
     </table>
@@ -98,11 +106,13 @@
                 <th>Disk</th>
                 <th>File</th>
                 <th>Pattern</th>
+                <th>Metadata</th>
             </tr>
         </thead>
         <tbody>
             @foreach($report['disk_scan']['findings']['malware_patterns'] as $item)
-            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ $item['pattern'] }}</td></tr>
+            @php $meta = $item['_metadata'] ?? null; @endphp
+            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ $item['pattern'] }}</td><td><small>@if($meta)Created: {{ $meta['created_at'] ?? '-' }} · Modified: {{ $meta['modified_at'] ?? '-' }}@if(($meta['owner'] ?? null)) · Owner: {{ $meta['owner'] }}@endif @if(($meta['group'] ?? null)) · Group: {{ $meta['group'] }}@endif @else - @endif</small></td></tr>
             @endforeach
         </tbody>
     </table>
@@ -116,11 +126,13 @@
                 <th>Location</th>
                 <th>File</th>
                 <th>Pattern</th>
+                <th>Metadata</th>
             </tr>
         </thead>
         <tbody>
             @foreach($report['disk_scan']['findings']['suspicious_paths'] as $item)
-            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ $item['pattern'] }}</td></tr>
+            @php $meta = $item['_metadata'] ?? null; @endphp
+            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ $item['pattern'] }}</td><td><small>@if($meta)Created: {{ $meta['created_at'] ?? '-' }} · Modified: {{ $meta['modified_at'] ?? '-' }}@if(($meta['owner'] ?? null)) · Owner: {{ $meta['owner'] }}@endif @if(($meta['group'] ?? null)) · Group: {{ $meta['group'] }}@endif @else - @endif</small></td></tr>
             @endforeach
         </tbody>
     </table>
@@ -134,11 +146,13 @@
                 <th>Disk</th>
                 <th>File</th>
                 <th>Extension</th>
+                <th>Metadata</th>
             </tr>
         </thead>
         <tbody>
             @foreach($report['disk_scan']['findings']['dangerous_files'] as $item)
-            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ $item['extension'] }}</td></tr>
+            @php $meta = $item['_metadata'] ?? null; @endphp
+            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ $item['extension'] }}</td><td><small>@if($meta)Created: {{ $meta['created_at'] ?? '-' }} · Modified: {{ $meta['modified_at'] ?? '-' }}@if(($meta['owner'] ?? null)) · Owner: {{ $meta['owner'] }}@endif @if(($meta['group'] ?? null)) · Group: {{ $meta['group'] }}@endif @else - @endif</small></td></tr>
             @endforeach
         </tbody>
     </table>
