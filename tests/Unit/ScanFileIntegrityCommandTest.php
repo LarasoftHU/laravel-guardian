@@ -186,6 +186,7 @@ class ScanFileIntegrityCommandTest extends TestCase
                 'suspicious_php' => [['disk' => 'local', 'file' => 'uploads/shell.php', 'functions' => ['eval']]],
                 'malware_patterns' => [],
                 'dangerous_files' => [['disk' => 'local', 'file' => 'uploads/malware.exe', 'extension' => 'exe']],
+                'suspicious_paths' => [],
             ]);
             $this->app->instance(DiskScanService::class, $diskScanService);
 
@@ -229,6 +230,7 @@ class ScanFileIntegrityCommandTest extends TestCase
                 'suspicious_php' => [['disk' => 'local', 'file' => 'uploads/shell.php', 'functions' => ['eval']]],
                 'malware_patterns' => [],
                 'dangerous_files' => [],
+                'suspicious_paths' => [],
             ]);
             $this->app->instance(DiskScanService::class, $diskScanService);
 

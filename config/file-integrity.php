@@ -261,6 +261,62 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Suspicious Path Patterns (WordPress / CMS-like)
+    |--------------------------------------------------------------------------
+    |
+    | File or directory path substrings that indicate WordPress or similar CMS.
+    | If found in storage or public path, triggers alert. Case-insensitive.
+    |
+    */
+    'suspicious_path_patterns' => [
+        'wp-admin',
+        'wp-includes',
+        'wp-content',
+        'wp-config',
+        'wp-login',
+        'wp-cron',
+        'wp-load',
+        'wp-settings',
+        'wp-blog-header',
+        'wp-activate',
+        'wp-signup',
+        'wp-mail',
+        'wp-links-opml',
+        'wp-trackback',
+        'wp-comments-post',
+        'xmlrpc',
+        'readme.html',
+        'license.txt',
+        'wp-json',
+        'wp-cron.php',
+        'wp-links-opml.php',
+        'wp-mail.php',
+        'wp-signup.php',
+        'wp-activate.php',
+        'wp-blog-header.php',
+        'wp-settings.php',
+        'wp-load.php',
+        'wp-login.php',
+        'wp-config.php',
+        'xmlrpc.php',
+        'administrator',   // Joomla
+        'configuration.php', // Joomla
+        'sites/default',   // Drupal
+        'includes/bootstrap', // Drupal
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scan Public Path
+    |--------------------------------------------------------------------------
+    |
+    | When true, also scans base_path('public') for suspicious path patterns.
+    |
+    */
+    'scan_public_path' => env('FILE_INTEGRITY_SCAN_PUBLIC_PATH', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Report Configuration
     |--------------------------------------------------------------------------
     */

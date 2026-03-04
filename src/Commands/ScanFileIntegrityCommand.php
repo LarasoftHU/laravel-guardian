@@ -71,18 +71,25 @@ class ScanFileIntegrityCommand extends Command
         $hasChanges = $summary['total'] > 0;
 
         $diskScanFindings = null;
-        $disksToScan = $this->option('no-disk-scan') ? [] : ($this->option('disks') ?: config('file-integrity.disk_scan', []));
+        $noDiskScan = $this->option('no-disk-scan');
+        $disksToScan = $noDiskScan ? [] : ($this->option('disks') ?: config('file-integrity.disk_scan', []));
         $disksToScan = is_array($disksToScan) ? $disksToScan : [];
+        $scanPublicPath = ! $noDiskScan && config('file-integrity.scan_public_path', true);
+        $disksForReport = $disksToScan;
+        if ($scanPublicPath && ! in_array('public', $disksForReport, true)) {
+            $disksForReport = array_merge($disksForReport, ['public']);
+        }
 
-        if (! empty($disksToScan)) {
+        if (! empty($disksToScan) || $scanPublicPath) {
             $diskScanFindings = $this->diskScanService->scanDisks($disksToScan);
             $diskSummary = $this->buildDiskSummary($diskScanFindings);
             $hasDiskFindings = $diskSummary['suspicious_php_count'] > 0
                 || $diskSummary['malware_patterns_count'] > 0
-                || $diskSummary['dangerous_files_count'] > 0;
+                || $diskSummary['dangerous_files_count'] > 0
+                || $diskSummary['suspicious_paths_count'] > 0;
         } else {
             $diskScanFindings = null;
-            $diskSummary = ['suspicious_php_count' => 0, 'malware_patterns_count' => 0, 'dangerous_files_count' => 0];
+            $diskSummary = ['suspicious_php_count' => 0, 'malware_patterns_count' => 0, 'dangerous_files_count' => 0, 'suspicious_paths_count' => 0];
             $hasDiskFindings = false;
         }
 
@@ -95,7 +102,7 @@ class ScanFileIntegrityCommand extends Command
             'summary' => $summary,
             'has_changes' => $hasChanges,
             'disk_scan' => [
-                'disks' => $disksToScan,
+                'disks' => $disksForReport,
                 'findings' => $diskScanFindings,
                 'summary' => $diskSummary,
                 'has_findings' => $hasDiskFindings,
@@ -240,8 +247,8 @@ class ScanFileIntegrityCommand extends Command
     }
 
     /**
-     * @param  array{suspicious_php: array, malware_patterns: array, dangerous_files: array}  $diskScanFindings
-     * @return array{suspicious_php_count: int, malware_patterns_count: int, dangerous_files_count: int}
+     * @param  array{suspicious_php: array, malware_patterns: array, dangerous_files: array, suspicious_paths: array}  $diskScanFindings
+     * @return array{suspicious_php_count: int, malware_patterns_count: int, dangerous_files_count: int, suspicious_paths_count: int}
      */
     private function buildDiskSummary(array $diskScanFindings): array
     {
@@ -249,6 +256,7 @@ class ScanFileIntegrityCommand extends Command
             'suspicious_php_count' => count($diskScanFindings['suspicious_php'] ?? []),
             'malware_patterns_count' => count($diskScanFindings['malware_patterns'] ?? []),
             'dangerous_files_count' => count($diskScanFindings['dangerous_files'] ?? []),
+            'suspicious_paths_count' => count($diskScanFindings['suspicious_paths'] ?? []),
         ];
     }
 
@@ -270,7 +278,8 @@ class ScanFileIntegrityCommand extends Command
             $this->line('Disk scan (' . implode(', ', $diskScan['disks']) . '): '
                 . ($ds['suspicious_php_count'] ?? 0) . ' suspicious PHP, '
                 . ($ds['malware_patterns_count'] ?? 0) . ' malware patterns, '
-                . ($ds['dangerous_files_count'] ?? 0) . ' dangerous extensions');
+                . ($ds['dangerous_files_count'] ?? 0) . ' dangerous extensions, '
+                . ($ds['suspicious_paths_count'] ?? 0) . ' WordPress/CMS-like paths');
         }
         $this->newLine();
 
@@ -322,6 +331,15 @@ class ScanFileIntegrityCommand extends Command
                     $rows[] = [$item['disk'], $item['file'], $item['extension']];
                 }
                 $this->table(['Disk', 'File', 'Extension'], $rows);
+            }
+            if (! empty($findings['suspicious_paths'])) {
+                $this->newLine();
+                $this->warn('WordPress/CMS-like paths found:');
+                $rows = [];
+                foreach ($findings['suspicious_paths'] as $item) {
+                    $rows[] = [$item['disk'], $item['file'], $item['pattern']];
+                }
+                $this->table(['Location', 'File', 'Pattern'], $rows);
             }
         }
 

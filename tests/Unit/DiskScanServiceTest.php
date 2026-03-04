@@ -18,6 +18,7 @@ class DiskScanServiceTest extends TestCase
         $this->assertSame([], $result['suspicious_php']);
         $this->assertSame([], $result['malware_patterns']);
         $this->assertSame([], $result['dangerous_files']);
+        $this->assertSame([], $result['suspicious_paths']);
     }
 
     public function test_scan_disks_detects_dangerous_extensions(): void
@@ -130,5 +131,22 @@ class DiskScanServiceTest extends TestCase
         $this->assertSame([], $result['suspicious_php']);
         $this->assertSame([], $result['malware_patterns']);
         $this->assertSame([], $result['dangerous_files']);
+        $this->assertSame([], $result['suspicious_paths']);
+    }
+
+    public function test_scan_disks_detects_suspicious_paths_in_storage(): void
+    {
+        Storage::fake('test');
+        Storage::disk('test')->put('uploads/wp-admin/shell.php', '<?php echo 1;');
+
+        config()->set('file-integrity.suspicious_path_patterns', ['wp-admin']);
+        config()->set('file-integrity.dangerous_extensions', ['exe']);
+
+        $service = $this->app->make(DiskScanService::class);
+        $result = $service->scanDisks(['test']);
+
+        $this->assertCount(1, $result['suspicious_paths']);
+        $this->assertSame('uploads/wp-admin/shell.php', $result['suspicious_paths'][0]['file']);
+        $this->assertSame('wp-admin', $result['suspicious_paths'][0]['pattern']);
     }
 }

@@ -38,7 +38,8 @@
         <strong>Disk scan alert:</strong><br>
         <strong>Suspicious PHP:</strong> {{ $report['disk_scan']['summary']['suspicious_php_count'] ?? 0 }} file(s) ·
         <strong>Malware patterns:</strong> {{ $report['disk_scan']['summary']['malware_patterns_count'] ?? 0 }} match(es) ·
-        <strong>Dangerous extensions:</strong> {{ $report['disk_scan']['summary']['dangerous_files_count'] ?? 0 }} file(s)
+        <strong>Dangerous extensions:</strong> {{ $report['disk_scan']['summary']['dangerous_files_count'] ?? 0 }} file(s) ·
+        <strong>WordPress/CMS-like paths:</strong> {{ $report['disk_scan']['summary']['suspicious_paths_count'] ?? 0 }}
     </div>
     @endif
 
@@ -101,6 +102,24 @@
         </thead>
         <tbody>
             @foreach($report['disk_scan']['findings']['malware_patterns'] as $item)
+            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ $item['pattern'] }}</td></tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
+    @if(($report['disk_scan']['has_findings'] ?? false) && !empty($report['disk_scan']['findings']['suspicious_paths'] ?? []))
+    <h2 style="font-size: 1rem; margin-top: 1.5rem;">WordPress/CMS-like paths found</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Location</th>
+                <th>File</th>
+                <th>Pattern</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($report['disk_scan']['findings']['suspicious_paths'] as $item)
             <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ $item['pattern'] }}</td></tr>
             @endforeach
         </tbody>

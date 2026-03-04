@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Larasofthu\LaravelGuardian\Services;
 
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 
 class DiskScanService
@@ -11,22 +12,23 @@ class DiskScanService
     private const PHP_OPENING_TAGS = '/<\?php|<\?=|<\\?/i';
 
     /**
-     * Scan one or more storage disks for suspicious PHP functions, malware patterns, and dangerous file extensions.
-     * Files under content_scan_max_bytes are read and checked for PHP content regardless of extension
-     * (e.g. .webp containing <?php). Files with dangerous extensions are not pattern-scanned (already flagged).
+     * Scan one or more storage disks for suspicious PHP functions, malware patterns, dangerous file extensions,
+     * and WordPress/CMS-like paths. Optionally scans base_path('public') for suspicious paths.
      *
      * @param  string[]  $disks
-     * @return array{suspicious_php: array<int, array{disk: string, file: string, functions: string[]}>, malware_patterns: array<int, array{disk: string, file: string, pattern: string}>, dangerous_files: array<int, array{disk: string, file: string, extension: string}>}
+     * @return array{suspicious_php: array, malware_patterns: array, dangerous_files: array, suspicious_paths: array}
      */
     public function scanDisks(array $disks): array
     {
         $suspiciousPhp = [];
         $malwarePatterns = [];
         $dangerousFiles = [];
+        $suspiciousPaths = [];
 
         $suspiciousFunctions = config('file-integrity.suspicious_php_functions', []);
         $malwarePatternConfig = config('file-integrity.malware_patterns', []);
         $dangerousExtensions = array_map('strtolower', config('file-integrity.dangerous_extensions', []));
+        $suspiciousPathPatterns = config('file-integrity.suspicious_path_patterns', []);
         $maxContentBytes = (int) config('file-integrity.content_scan_max_bytes', 200 * 1024);
 
         foreach ($disks as $diskName) {
@@ -39,6 +41,15 @@ class DiskScanService
             $allFiles = $this->getAllFiles($disk);
 
             foreach ($allFiles as $path) {
+                $matchedPathPattern = $this->matchSuspiciousPath($path, $suspiciousPathPatterns);
+                if ($matchedPathPattern !== null) {
+                    $suspiciousPaths[] = [
+                        'disk' => $diskName,
+                        'file' => $path,
+                        'pattern' => $matchedPathPattern,
+                    ];
+                }
+
                 $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
                 $hasDangerousExtension = in_array($ext, $dangerousExtensions, true);
 
@@ -84,11 +95,69 @@ class DiskScanService
             }
         }
 
+        if (config('file-integrity.scan_public_path', true)) {
+            foreach ($this->getPublicPathFiles() as $relativePath) {
+                $matchedPathPattern = $this->matchSuspiciousPath($relativePath, $suspiciousPathPatterns);
+                if ($matchedPathPattern !== null) {
+                    $suspiciousPaths[] = [
+                        'disk' => 'public',
+                        'file' => $relativePath,
+                        'pattern' => $matchedPathPattern,
+                    ];
+                }
+            }
+        }
+
         return [
             'suspicious_php' => $suspiciousPhp,
             'malware_patterns' => $malwarePatterns,
             'dangerous_files' => $dangerousFiles,
+            'suspicious_paths' => $suspiciousPaths,
         ];
+    }
+
+    /**
+     * @return string|null  Matched pattern or null
+     */
+    private function matchSuspiciousPath(string $path, array $patterns): ?string
+    {
+        $normalized = str_replace('\\', '/', strtolower($path));
+        foreach ($patterns as $pattern) {
+            if (str_contains($normalized, strtolower($pattern))) {
+                return $pattern;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function getPublicPathFiles(): array
+    {
+        $publicPath = base_path('public');
+        if (! is_dir($publicPath)) {
+            return [];
+        }
+
+        try {
+            $files = File::allFiles($publicPath);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $base = rtrim(str_replace('\\', '/', $publicPath), '/') . '/';
+        $result = [];
+
+        foreach ($files as $file) {
+            $fullPath = str_replace('\\', '/', $file->getPathname());
+            if (str_starts_with($fullPath, $base)) {
+                $result[] = substr($fullPath, strlen($base));
+            }
+        }
+
+        return $result;
     }
 
     /**

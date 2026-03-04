@@ -79,6 +79,14 @@ Empty array = no disk scan. Example: `['local', 'public', 'uploads']`
 
 Max file size (bytes) to read and scan for PHP content. Default: 204800 (200 KB). Larger files are skipped for content scan.
 
+### `suspicious_path_patterns`
+
+Path substrings that indicate WordPress or similar CMS (e.g. wp-admin, wp-includes, wp-config). If found in storage or `public/`, triggers alert. Case-insensitive.
+
+### `scan_public_path`
+
+When `true`, scans `base_path('public')` for WordPress/CMS-like paths. Default: `true`. Use `--no-disk-scan` to skip.
+
 ### `suspicious_php_functions`
 
 List of PHP functions considered dangerous when found in storage. Customize in config. Default includes: eval, exec, shell_exec, system, passthru, popen, proc_open, assert, create_function, unserialize.
@@ -186,12 +194,14 @@ To receive email notifications when changes are detected, enable the `report.mai
   },
   "has_changes": true,
   "disk_scan": {
-    "disks": ["local", "uploads"],
+    "disks": ["local", "uploads", "public"],
     "findings": {
       "suspicious_php": [{"disk": "uploads", "file": "shell.php", "functions": ["eval"]}],
-      "dangerous_files": [{"disk": "uploads", "file": "malware.exe", "extension": "exe"}]
+      "malware_patterns": [],
+      "dangerous_files": [{"disk": "uploads", "file": "malware.exe", "extension": "exe"}],
+      "suspicious_paths": [{"disk": "public", "file": "wp-admin/index.php", "pattern": "wp-admin"}]
     },
-    "summary": {"suspicious_php_count": 1, "dangerous_files_count": 1},
+    "summary": {"suspicious_php_count": 1, "malware_patterns_count": 0, "dangerous_files_count": 1, "suspicious_paths_count": 1},
     "has_findings": true
   },
   "exit_code": 1
@@ -235,6 +245,7 @@ jobs:
 | `FILE_INTEGRITY_INCLUDE_UNTRACKED` | `false` to skip untracked file detection |
 | `FILE_INTEGRITY_DISK_SCAN` | Comma-separated disk names to scan (e.g. `local,uploads`) |
 | `FILE_INTEGRITY_CONTENT_SCAN_MAX_BYTES` | Max bytes to read per file for PHP content scan (default: 204800) |
+| `FILE_INTEGRITY_SCAN_PUBLIC_PATH` | `false` to skip scanning `public/` for WordPress/CMS-like paths |
 | `FILE_INTEGRITY_OUTPUT` | `console`, `json`, or `both` |
 | `FILE_INTEGRITY_FAIL_ON_CHANGES` | `true` to exit 1 on changes or disk findings |
 | `FILE_INTEGRITY_LOG` | `true` to log results |
