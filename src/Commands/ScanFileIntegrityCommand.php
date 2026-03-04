@@ -240,21 +240,18 @@ class ScanFileIntegrityCommand extends Command
     private function sendMailReport(array $report): void
     {
         $recipients = config('file-integrity.report.mail_to', []);
+        $recipients = is_array($recipients)
+            ? $recipients
+            : array_filter(array_map('trim', explode(',', (string) $recipients)));
         if (empty($recipients)) {
             return;
         }
 
         try {
-            Mail::raw(
-                "File Integrity Scan Report\n\n" .
-                "Base ref: {$report['base_ref']}\n" .
-                "Total changes: {$report['summary']['total']}\n\n" .
-                json_encode($report['changed_files'], JSON_PRETTY_PRINT),
-                function ($message) use ($recipients): void {
-                    $message->to($recipients)
-                        ->subject('File Integrity Scan: Changes Detected');
-                }
-            );
+            Mail::send('file-integrity::file-integrity-report', ['report' => $report], function ($message) use ($recipients): void {
+                $message->to($recipients)
+                    ->subject('File Integrity Scan: Changes Detected');
+            });
         } catch (\Throwable $e) {
             $this->warn('Failed to send mail report: ' . $e->getMessage());
         }

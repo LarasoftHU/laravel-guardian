@@ -24,6 +24,14 @@ Publish the config file:
 php artisan vendor:publish --tag="file-integrity-config"
 ```
 
+To customize the HTML mail template (when using mail reports):
+
+```bash
+php artisan vendor:publish --tag="file-integrity-views"
+```
+
+This copies the mail template to `resources/views/vendor/file-integrity/file-integrity-report.blade.php`.
+
 This creates `config/file-integrity.php` with the following options:
 
 ### `base_ref`

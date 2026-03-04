@@ -16,6 +16,7 @@ class FileIntegrityServiceProvider extends PackageServiceProvider
         $package
             ->name('file-integrity')
             ->hasConfigFile('file-integrity')
+            ->hasViews()
             ->hasCommand(ScanFileIntegrityCommand::class);
     }
 
