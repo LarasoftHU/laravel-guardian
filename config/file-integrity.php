@@ -67,19 +67,173 @@ return [
     |
     | PHP functions that are considered dangerous when found in uploaded
     | or user-accessible files (e.g. in storage). Triggers alert when detected.
+    | Comprehensive list covering code execution, obfuscation, I/O, and RCE.
     |
     */
     'suspicious_php_functions' => [
+        // Code execution (critical)
         'eval',
+        'assert',
+        'create_function',
+        'preg_replace', // with /e modifier
+        'call_user_func',
+        'call_user_func_array',
+        'call_user_method',
+        'call_user_method_array',
+        'forward_static_call',
+        'forward_static_call_array',
+        'usort',
+        'uasort',
+        'uksort',
+        'array_filter',
+        'array_map',
+        'array_reduce',
+        'array_walk',
+        'array_walk_recursive',
+        'register_shutdown_function',
+        'register_tick_function',
+        // Command / process execution
         'exec',
         'shell_exec',
         'system',
         'passthru',
         'popen',
         'proc_open',
-        'assert',
-        'create_function',
+        'proc_close',
+        'proc_get_status',
+        'proc_terminate',
+        'pcntl_exec',
+        'pcntl_signal',
+        'pcntl_fork',
+        'escapeshellarg',
+        'escapeshellcmd',
+        // Obfuscation / decoding (often used in malware)
+        'base64_decode',
+        'gzinflate',
+        'gzuncompress',
+        'gzdecode',
+        'str_rot13',
+        'convert_uuencode',
+        'convert_uudecode',
+        'rawurldecode',
+        'bzdecompress',
+        'convert_iconv',
+        'hex2bin',
+        'bin2hex',
+        // Serialization (object injection)
         'unserialize',
+        'serialize',
+        // File inclusion (RFI/LFI)
+        'include',
+        'include_once',
+        'require',
+        'require_once',
+        // File write (webshell persistence)
+        'file_put_contents',
+        'fwrite',
+        'fputs',
+        'ftruncate',
+        'fputcsv',
+        // File read (data exfil, LFI)
+        'file_get_contents',
+        'readfile',
+        'fread',
+        'fgets',
+        'fgetss',
+        'fgetc',
+        'file',
+        'parse_ini_file',
+        'highlight_file',
+        'show_source',
+        // Stream / socket (remote code fetch)
+        'fsockopen',
+        'pfsockopen',
+        'stream_socket_client',
+        'stream_socket_server',
+        'stream_socket_accept',
+        'curl_exec',
+        'curl_multi_exec',
+        // Process / system info
+        'phpinfo',
+        'php_uname',
+        'getenv',
+        'putenv',
+        'get_current_user',
+        'getmyuid',
+        'getmypid',
+        'dl',
+        // Reflection (dynamic invocation)
+        'ReflectionFunction',
+        'ReflectionMethod',
+        'ReflectionClass',
+        // XML (XXE)
+        'simplexml_load_string',
+        'simplexml_load_file',
+        'xml_parse',
+        'xml_parse_into_struct',
+        // LDAP injection
+        'ldap_search',
+        'ldap_list',
+        'ldap_read',
+        // Database (SQLi vector when concatenated)
+        'pg_exec',
+        'pg_query',
+        'mysql_query',
+        'mysqli_query',
+        // Mail (abuse / spam)
+        'mail',
+        'mb_send_mail',
+        // Other
+        'chmod',
+        'chown',
+        'chgrp',
+        'symlink',
+        'link',
+        'touch',
+        'move_uploaded_file',
+        'copy',
+        'rename',
+        'unlink',
+        'rmdir',
+        'mkdir',
+        'opendir',
+        'readdir',
+        'scandir',
+        'glob',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Malware Regex Patterns
+    |--------------------------------------------------------------------------
+    |
+    | Regex patterns that detect obfuscated or known malware signatures.
+    | Key = human-readable name, Value = PCRE regex (without delimiters).
+    |
+    */
+    'malware_patterns' => [
+        'eval_base64_decode' => 'eval\s*\(\s*base64_decode\s*\(',
+        'eval_gzinflate' => 'eval\s*\(\s*gzinflate\s*\(',
+        'eval_post' => 'eval\s*\(\s*\$[a-z0-9_]*\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)',
+        'eval_variable' => '{\s*eval\s*\(\s*\$',
+        'chr_eval_obfuscation' => 'chr\s*\(\s*101\s*\)\s*\.\s*chr\s*\(\s*118\s*\)\s*\.\s*chr\s*\(\s*97\s*\)\s*\.\s*chr\s*\(\s*108\s*',
+        'chr_concat_obfuscation' => '(chr\s*\(\s*\d+\s*\)\s*\.\s*){4,}',
+        'create_function_empty' => 'create_function\s*\(\s*[\'"]{2}\s*,\s*[\'"]',
+        'preg_replace_e_modifier' => 'preg_replace\s*\([^)]*\/[eE]\s*[\)\s,]',
+        'base64_long_string' => '[\'"][A-Za-z0-9+\/]{200,}={0,3}[\'"]',
+        'escaped_octal_commands' => '(\\\\[0-9]{3}){6,}',
+        'globals_inject' => '\$GLOBALS\s*\[\s*\$[a-z0-9_]+\s*\]\s*\[',
+        'cookie_payload' => 'urldecode\s*\(\s*\$_(?:GET|POST|COOKIE|REQUEST)\s*\[',
+        'file_get_contents_remote' => 'file_get_contents\s*\(\s*(?:base64_decode|urldecode|gzinflate)\s*\(\s*\$_(?:GET|POST|REQUEST)',
+        'fwrite_post_data' => 'fwrite\s*\(\s*\$[a-z0-9_]+\s*,\s*(?:stripslashes\s*\(\s*)?@?\$_(?:GET|POST|REQUEST)',
+        'gzinflate_payload' => 'gzinflate\s*\(\s*(?:base64_decode|str_rot13)\s*\(',
+        'variable_function_call' => '\$[a-z0-9_]+\s*\(\s*\$[a-z0-9_]+\s*\(',
+        'obfuscated_include' => '@\s*(?:include|require)(?:_once)?\s+[\'"][^"\']*(?:\\\\x[0-9a-f]{2}){3,}',
+        'php_uname_shell' => 'php_uname\s*\(\s*[\'"][asrvm]+[\'"]\s*\)',
+        'gzip_magic_payload' => '\$[a-zA-Z0-9_]+\s*\(\s*[\'"]\\\\x78\\\\x9C',
+        'xor_decode_post' => '(\^\s*\$[a-z0-9_]+\s*\[\s*\$[a-z0-9_]+\s*%\s*strlen\s*\(\s*\$[a-z0-9_]+\s*\]\s*){2,}',
+        'dynamic_array_call' => '@\s*\$[a-z]\s*\[\s*\d+\s*\]\s*\(\s*\$[a-z]\s*\[\s*\d+\s*\]\s*\)',
+        'eval_hex_string' => 'eval\s*\(\s*[a-zA-Z0-9_]+\s*\(\s*[\'"][A-Z0-9]{16,}',
     ],
 
     /*
@@ -91,7 +245,7 @@ return [
     | If found, triggers an email alert. Example: exe, php, sh, bash
     |
     */
-    'dangerous_extensions' => ['exe', 'bat', 'cmd', 'com', 'sh', 'bash', 'php', 'php3', 'php4', 'php5', 'phtml', 'pl', 'py', 'cgi'],
+    'dangerous_extensions' => ['exe', 'bat', 'cmd', 'com', 'sh', 'bash', 'php', 'php3', 'php4', 'php5', 'phtml', 'phar', 'pl', 'py', 'cgi', 'asp', 'aspx', 'jsp', 'jar', 'vbs', 'vbe', 'wsf', 'wsh', 'ps1', 'psm1', 'scr', 'msi', 'dll'],
 
     /*
     |--------------------------------------------------------------------------

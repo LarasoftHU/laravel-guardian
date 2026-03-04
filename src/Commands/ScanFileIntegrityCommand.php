@@ -77,10 +77,12 @@ class ScanFileIntegrityCommand extends Command
         if (! empty($disksToScan)) {
             $diskScanFindings = $this->diskScanService->scanDisks($disksToScan);
             $diskSummary = $this->buildDiskSummary($diskScanFindings);
-            $hasDiskFindings = $diskSummary['suspicious_php_count'] > 0 || $diskSummary['dangerous_files_count'] > 0;
+            $hasDiskFindings = $diskSummary['suspicious_php_count'] > 0
+                || $diskSummary['malware_patterns_count'] > 0
+                || $diskSummary['dangerous_files_count'] > 0;
         } else {
             $diskScanFindings = null;
-            $diskSummary = ['suspicious_php_count' => 0, 'dangerous_files_count' => 0];
+            $diskSummary = ['suspicious_php_count' => 0, 'malware_patterns_count' => 0, 'dangerous_files_count' => 0];
             $hasDiskFindings = false;
         }
 
@@ -238,13 +240,14 @@ class ScanFileIntegrityCommand extends Command
     }
 
     /**
-     * @param  array{suspicious_php: array, dangerous_files: array}  $diskScanFindings
-     * @return array{suspicious_php_count: int, dangerous_files_count: int}
+     * @param  array{suspicious_php: array, malware_patterns: array, dangerous_files: array}  $diskScanFindings
+     * @return array{suspicious_php_count: int, malware_patterns_count: int, dangerous_files_count: int}
      */
     private function buildDiskSummary(array $diskScanFindings): array
     {
         return [
             'suspicious_php_count' => count($diskScanFindings['suspicious_php'] ?? []),
+            'malware_patterns_count' => count($diskScanFindings['malware_patterns'] ?? []),
             'dangerous_files_count' => count($diskScanFindings['dangerous_files'] ?? []),
         ];
     }
@@ -264,7 +267,10 @@ class ScanFileIntegrityCommand extends Command
 
         if ($diskScan && ! empty($diskScan['disks'])) {
             $ds = $diskScan['summary'] ?? [];
-            $this->line('Disk scan (' . implode(', ', $diskScan['disks']) . '): ' . ($ds['suspicious_php_count'] ?? 0) . ' suspicious PHP, ' . ($ds['dangerous_files_count'] ?? 0) . ' dangerous extensions');
+            $this->line('Disk scan (' . implode(', ', $diskScan['disks']) . '): '
+                . ($ds['suspicious_php_count'] ?? 0) . ' suspicious PHP, '
+                . ($ds['malware_patterns_count'] ?? 0) . ' malware patterns, '
+                . ($ds['dangerous_files_count'] ?? 0) . ' dangerous extensions');
         }
         $this->newLine();
 
@@ -298,6 +304,15 @@ class ScanFileIntegrityCommand extends Command
                     $rows[] = [$item['disk'], $item['file'], implode(', ', $item['functions'])];
                 }
                 $this->table(['Disk', 'File', 'Functions'], $rows);
+            }
+            if (! empty($findings['malware_patterns'])) {
+                $this->newLine();
+                $this->warn('Malware patterns detected:');
+                $rows = [];
+                foreach ($findings['malware_patterns'] as $item) {
+                    $rows[] = [$item['disk'], $item['file'], $item['pattern']];
+                }
+                $this->table(['Disk', 'File', 'Pattern'], $rows);
             }
             if (! empty($findings['dangerous_files'])) {
                 $this->newLine();

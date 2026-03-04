@@ -16,6 +16,7 @@ class DiskScanServiceTest extends TestCase
         $result = $service->scanDisks([]);
 
         $this->assertSame([], $result['suspicious_php']);
+        $this->assertSame([], $result['malware_patterns']);
         $this->assertSame([], $result['dangerous_files']);
     }
 
@@ -51,12 +52,30 @@ class DiskScanServiceTest extends TestCase
         $this->assertSame(['eval'], $result['suspicious_php'][0]['functions']);
     }
 
+    public function test_scan_disks_detects_malware_patterns(): void
+    {
+        Storage::fake('test');
+        Storage::disk('test')->put('uploads/backdoor.php', '<?php eval(base64_decode($_POST["x"]));');
+
+        config()->set('file-integrity.malware_patterns', [
+            'eval_base64_decode' => 'eval\s*\(\s*base64_decode\s*\(',
+        ]);
+
+        $service = $this->app->make(DiskScanService::class);
+        $result = $service->scanDisks(['test']);
+
+        $this->assertCount(1, $result['malware_patterns']);
+        $this->assertSame('uploads/backdoor.php', $result['malware_patterns'][0]['file']);
+        $this->assertSame('eval_base64_decode', $result['malware_patterns'][0]['pattern']);
+    }
+
     public function test_scan_disks_skips_unknown_disk(): void
     {
         $service = $this->app->make(DiskScanService::class);
         $result = $service->scanDisks(['nonexistent-disk-xyz']);
 
         $this->assertSame([], $result['suspicious_php']);
+        $this->assertSame([], $result['malware_patterns']);
         $this->assertSame([], $result['dangerous_files']);
     }
 }

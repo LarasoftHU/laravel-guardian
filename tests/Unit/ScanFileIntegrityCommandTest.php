@@ -184,6 +184,7 @@ class ScanFileIntegrityCommandTest extends TestCase
             $diskScanService = $this->createMock(DiskScanService::class);
             $diskScanService->method('scanDisks')->willReturn([
                 'suspicious_php' => [['disk' => 'local', 'file' => 'uploads/shell.php', 'functions' => ['eval']]],
+                'malware_patterns' => [],
                 'dangerous_files' => [['disk' => 'local', 'file' => 'uploads/malware.exe', 'extension' => 'exe']],
             ]);
             $this->app->instance(DiskScanService::class, $diskScanService);
@@ -226,6 +227,7 @@ class ScanFileIntegrityCommandTest extends TestCase
             $diskScanService = $this->createMock(DiskScanService::class);
             $diskScanService->method('scanDisks')->willReturn([
                 'suspicious_php' => [['disk' => 'local', 'file' => 'uploads/shell.php', 'functions' => ['eval']]],
+                'malware_patterns' => [],
                 'dangerous_files' => [],
             ]);
             $this->app->instance(DiskScanService::class, $diskScanService);
