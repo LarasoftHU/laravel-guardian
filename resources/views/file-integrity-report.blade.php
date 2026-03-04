@@ -33,6 +33,14 @@
         <strong>Renamed:</strong> {{ $report['summary']['renamed'] }}
     </div>
 
+    @if(($report['disk_scan']['has_findings'] ?? false))
+    <div class="summary" style="background: #fff3cd; margin-top: 0.5rem;">
+        <strong>Disk scan alert:</strong><br>
+        <strong>Suspicious PHP:</strong> {{ $report['disk_scan']['summary']['suspicious_php_count'] ?? 0 }} file(s) ·
+        <strong>Dangerous extensions:</strong> {{ $report['disk_scan']['summary']['dangerous_files_count'] ?? 0 }} file(s)
+    </div>
+    @endif
+
     @if($report['summary']['total'] > 0)
     <table>
         <thead>
@@ -57,6 +65,42 @@
             @endforeach
             @foreach($report['changed_files']['renamed'] ?? [] as $pair)
             <tr><td class="status-renamed">Renamed</td><td>{{ $pair['from'] }}</td><td>→ {{ $pair['to'] }}</td></tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
+    @if(($report['disk_scan']['has_findings'] ?? false) && !empty($report['disk_scan']['findings']['suspicious_php'] ?? []))
+    <h2 style="font-size: 1rem; margin-top: 1.5rem;">Suspicious PHP functions detected</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Disk</th>
+                <th>File</th>
+                <th>Functions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($report['disk_scan']['findings']['suspicious_php'] as $item)
+            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ implode(', ', $item['functions']) }}</td></tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
+    @if(($report['disk_scan']['has_findings'] ?? false) && !empty($report['disk_scan']['findings']['dangerous_files'] ?? []))
+    <h2 style="font-size: 1rem; margin-top: 1.5rem;">Dangerous file extensions found</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Disk</th>
+                <th>File</th>
+                <th>Extension</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($report['disk_scan']['findings']['dangerous_files'] as $item)
+            <tr><td>{{ $item['disk'] }}</td><td>{{ $item['file'] }}</td><td>{{ $item['extension'] }}</td></tr>
             @endforeach
         </tbody>
     </table>

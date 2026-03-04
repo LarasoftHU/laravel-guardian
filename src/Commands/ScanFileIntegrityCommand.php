@@ -7,6 +7,7 @@ namespace Larasofthu\LaravelGuardian\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Larasofthu\LaravelGuardian\Services\DiskScanService;
 use Larasofthu\LaravelGuardian\Services\GitDiffService;
 
 class ScanFileIntegrityCommand extends Command
@@ -16,12 +17,15 @@ class ScanFileIntegrityCommand extends Command
         {--json : Output JSON for CI usage}
         {--paths=* : Paths to include (overrides config)}
         {--exclude-paths=* : Paths to exclude (overrides config)}
+        {--disks=* : Storage disks to scan for suspicious PHP and dangerous extensions (overrides config)}
+        {--no-disk-scan : Skip disk scan even when configured}
         {--no-fail : Do not exit with non-zero code when changes found}';
 
-    protected $description = 'Scan for modified, added, or deleted files compared to Git state';
+    protected $description = 'Scan for modified, added, or deleted files compared to Git state; optionally scan storage disks for suspicious PHP and dangerous file extensions';
 
     public function __construct(
-        private readonly GitDiffService $gitDiffService
+        private readonly GitDiffService $gitDiffService,
+        private readonly DiskScanService $diskScanService
     ) {
         parent::__construct();
     }
@@ -66,13 +70,34 @@ class ScanFileIntegrityCommand extends Command
         $summary = $this->buildSummary($changedFiles);
         $hasChanges = $summary['total'] > 0;
 
-        $exitCode = ($hasChanges && $failOnChanges) ? self::FAILURE : self::SUCCESS;
+        $diskScanFindings = null;
+        $disksToScan = $this->option('no-disk-scan') ? [] : ($this->option('disks') ?: config('file-integrity.disk_scan', []));
+        $disksToScan = is_array($disksToScan) ? $disksToScan : [];
+
+        if (! empty($disksToScan)) {
+            $diskScanFindings = $this->diskScanService->scanDisks($disksToScan);
+            $diskSummary = $this->buildDiskSummary($diskScanFindings);
+            $hasDiskFindings = $diskSummary['suspicious_php_count'] > 0 || $diskSummary['dangerous_files_count'] > 0;
+        } else {
+            $diskScanFindings = null;
+            $diskSummary = ['suspicious_php_count' => 0, 'dangerous_files_count' => 0];
+            $hasDiskFindings = false;
+        }
+
+        $shouldFail = $failOnChanges && ($hasChanges || $hasDiskFindings);
+        $exitCode = $shouldFail ? self::FAILURE : self::SUCCESS;
 
         $report = [
             'base_ref' => $baseRef,
             'changed_files' => $changedFiles,
             'summary' => $summary,
             'has_changes' => $hasChanges,
+            'disk_scan' => [
+                'disks' => $disksToScan,
+                'findings' => $diskScanFindings,
+                'summary' => $diskSummary,
+                'has_findings' => $hasDiskFindings,
+            ],
             'exit_code' => $exitCode,
         ];
 
@@ -88,7 +113,8 @@ class ScanFileIntegrityCommand extends Command
             Log::info('File integrity scan completed', $report);
         }
 
-        if ($hasChanges && config('file-integrity.report.mail', false)) {
+        $shouldMail = ($hasChanges || $hasDiskFindings) && config('file-integrity.report.mail', false);
+        if ($shouldMail) {
             $this->sendMailReport($report);
         }
 
@@ -212,42 +238,81 @@ class ScanFileIntegrityCommand extends Command
     }
 
     /**
-     * @param  array{base_ref: string, changed_files: array, summary: array, has_changes: bool, exit_code: int}  $report
+     * @param  array{suspicious_php: array, dangerous_files: array}  $diskScanFindings
+     * @return array{suspicious_php_count: int, dangerous_files_count: int}
+     */
+    private function buildDiskSummary(array $diskScanFindings): array
+    {
+        return [
+            'suspicious_php_count' => count($diskScanFindings['suspicious_php'] ?? []),
+            'dangerous_files_count' => count($diskScanFindings['dangerous_files'] ?? []),
+        ];
+    }
+
+    /**
+     * @param  array{base_ref: string, changed_files: array, summary: array, has_changes: bool, disk_scan: array, exit_code: int}  $report
      */
     private function outputConsoleReport(array $report): void
     {
         $summary = $report['summary'];
         $changedFiles = $report['changed_files'];
+        $diskScan = $report['disk_scan'] ?? null;
 
         $this->newLine();
         $this->info('File Integrity Scan (base: ' . $report['base_ref'] . ')');
         $this->line('Total changed files: ' . $summary['total']);
+
+        if ($diskScan && ! empty($diskScan['disks'])) {
+            $ds = $diskScan['summary'] ?? [];
+            $this->line('Disk scan (' . implode(', ', $diskScan['disks']) . '): ' . ($ds['suspicious_php_count'] ?? 0) . ' suspicious PHP, ' . ($ds['dangerous_files_count'] ?? 0) . ' dangerous extensions');
+        }
         $this->newLine();
 
-        if ($summary['total'] === 0) {
-            $this->comment('No changes detected.');
-            return;
+        if ($summary['total'] > 0) {
+            $rows = [];
+            foreach ($changedFiles['added'] as $file) {
+                $rows[] = ['Added', $file, ''];
+            }
+            foreach ($changedFiles['modified'] as $file) {
+                $rows[] = ['Modified', $file, ''];
+            }
+            foreach ($changedFiles['deleted'] as $file) {
+                $rows[] = ['Deleted', $file, ''];
+            }
+            foreach ($changedFiles['untracked'] ?? [] as $file) {
+                $rows[] = ['Untracked', $file, ''];
+            }
+            foreach ($changedFiles['renamed'] as $pair) {
+                $rows[] = ['Renamed', $pair['from'], '→ ' . $pair['to']];
+            }
+            $this->table(['Status', 'File', 'To'], $rows);
         }
 
-        $rows = [];
+        if ($diskScan && ($diskScan['has_findings'] ?? false)) {
+            $findings = $diskScan['findings'] ?? [];
+            if (! empty($findings['suspicious_php'])) {
+                $this->newLine();
+                $this->warn('Suspicious PHP functions detected:');
+                $rows = [];
+                foreach ($findings['suspicious_php'] as $item) {
+                    $rows[] = [$item['disk'], $item['file'], implode(', ', $item['functions'])];
+                }
+                $this->table(['Disk', 'File', 'Functions'], $rows);
+            }
+            if (! empty($findings['dangerous_files'])) {
+                $this->newLine();
+                $this->warn('Dangerous file extensions found:');
+                $rows = [];
+                foreach ($findings['dangerous_files'] as $item) {
+                    $rows[] = [$item['disk'], $item['file'], $item['extension']];
+                }
+                $this->table(['Disk', 'File', 'Extension'], $rows);
+            }
+        }
 
-        foreach ($changedFiles['added'] as $file) {
-            $rows[] = ['Added', $file, ''];
+        if ($summary['total'] === 0 && ! ($diskScan['has_findings'] ?? false)) {
+            $this->comment('No changes or security findings detected.');
         }
-        foreach ($changedFiles['modified'] as $file) {
-            $rows[] = ['Modified', $file, ''];
-        }
-        foreach ($changedFiles['deleted'] as $file) {
-            $rows[] = ['Deleted', $file, ''];
-        }
-        foreach ($changedFiles['untracked'] ?? [] as $file) {
-            $rows[] = ['Untracked', $file, ''];
-        }
-        foreach ($changedFiles['renamed'] as $pair) {
-            $rows[] = ['Renamed', $pair['from'], '→ ' . $pair['to']];
-        }
-
-        $this->table(['Status', 'File', 'To'], $rows);
     }
 
     /**

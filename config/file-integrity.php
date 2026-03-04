@@ -51,6 +51,50 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Disk Scan (Storage Disks)
+    |--------------------------------------------------------------------------
+    |
+    | Optionally scan one or more Laravel storage disks for security issues.
+    | Empty array = no disk scan. Example: ['local', 'public', 'uploads']
+    |
+    */
+    'disk_scan' => array_filter(array_map('trim', explode(',', env('FILE_INTEGRITY_DISK_SCAN', '')))),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Suspicious PHP Functions
+    |--------------------------------------------------------------------------
+    |
+    | PHP functions that are considered dangerous when found in uploaded
+    | or user-accessible files (e.g. in storage). Triggers alert when detected.
+    |
+    */
+    'suspicious_php_functions' => [
+        'eval',
+        'exec',
+        'shell_exec',
+        'system',
+        'passthru',
+        'popen',
+        'proc_open',
+        'assert',
+        'create_function',
+        'unserialize',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dangerous File Extensions
+    |--------------------------------------------------------------------------
+    |
+    | File extensions that should not typically exist in storage (uploads).
+    | If found, triggers an email alert. Example: exe, php, sh, bash
+    |
+    */
+    'dangerous_extensions' => ['exe', 'bat', 'cmd', 'com', 'sh', 'bash', 'php', 'php3', 'php4', 'php5', 'phtml', 'pl', 'py', 'cgi'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Report Configuration
     |--------------------------------------------------------------------------
     */

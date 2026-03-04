@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Larasofthu\LaravelGuardian\Tests\Unit;
 
 use Larasofthu\LaravelGuardian\Commands\ScanFileIntegrityCommand;
+use Larasofthu\LaravelGuardian\Services\DiskScanService;
 use Larasofthu\LaravelGuardian\Services\GitDiffService;
 use Larasofthu\LaravelGuardian\Tests\TestCase;
 use Illuminate\Support\Facades\File;
@@ -165,6 +166,115 @@ class ScanFileIntegrityCommandTest extends TestCase
             $this->assertSame(2, $report['summary']['untracked']);
             $this->assertSame(['app/NewFile.php', 'config/extra.php'], $report['changed_files']['untracked']);
             $this->assertSame(2, $report['summary']['total']);
+        } finally {
+            exec("rm -rf {$tempDir}");
+        }
+    }
+
+    public function test_disk_scan_findings_included_in_report_when_configured(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/laravel-guardian-test-' . uniqid();
+        File::makeDirectory($tempDir, 0755, true);
+        exec("cd {$tempDir} && git init 2>/dev/null");
+
+        try {
+            $this->app->setBasePath($tempDir);
+            config()->set('file-integrity.disk_scan', ['local']);
+
+            $diskScanService = $this->createMock(DiskScanService::class);
+            $diskScanService->method('scanDisks')->willReturn([
+                'suspicious_php' => [['disk' => 'local', 'file' => 'uploads/shell.php', 'functions' => ['eval']]],
+                'dangerous_files' => [['disk' => 'local', 'file' => 'uploads/malware.exe', 'extension' => 'exe']],
+            ]);
+            $this->app->instance(DiskScanService::class, $diskScanService);
+
+            $gitDiffService = $this->createMock(GitDiffService::class);
+            $gitDiffService->method('runDiff')->willReturn('');
+            $gitDiffService->method('getUntrackedFiles')->willReturn([]);
+            $this->app->instance(GitDiffService::class, $gitDiffService);
+
+            $command = $this->app->make(ScanFileIntegrityCommand::class);
+            $command->setLaravel($this->app);
+
+            $output = new \Symfony\Component\Console\Output\BufferedOutput();
+            $exitCode = $command->run(
+                new \Symfony\Component\Console\Input\ArrayInput(['--json' => true]),
+                $output
+            );
+
+            $report = json_decode($output->fetch(), true);
+            $this->assertTrue($report['disk_scan']['has_findings']);
+            $this->assertSame(1, $report['disk_scan']['summary']['suspicious_php_count']);
+            $this->assertSame(1, $report['disk_scan']['summary']['dangerous_files_count']);
+            $this->assertSame(ScanFileIntegrityCommand::SUCCESS, $exitCode);
+        } finally {
+            exec("rm -rf {$tempDir}");
+        }
+    }
+
+    public function test_disk_scan_findings_cause_failure_when_fail_on_changes_enabled(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/laravel-guardian-test-' . uniqid();
+        File::makeDirectory($tempDir, 0755, true);
+        exec("cd {$tempDir} && git init 2>/dev/null");
+
+        try {
+            $this->app->setBasePath($tempDir);
+            config()->set('file-integrity.disk_scan', ['local']);
+            config()->set('file-integrity.report.fail_on_changes', true);
+
+            $diskScanService = $this->createMock(DiskScanService::class);
+            $diskScanService->method('scanDisks')->willReturn([
+                'suspicious_php' => [['disk' => 'local', 'file' => 'uploads/shell.php', 'functions' => ['eval']]],
+                'dangerous_files' => [],
+            ]);
+            $this->app->instance(DiskScanService::class, $diskScanService);
+
+            $gitDiffService = $this->createMock(GitDiffService::class);
+            $gitDiffService->method('runDiff')->willReturn('');
+            $gitDiffService->method('getUntrackedFiles')->willReturn([]);
+            $this->app->instance(GitDiffService::class, $gitDiffService);
+
+            $command = $this->app->make(ScanFileIntegrityCommand::class);
+            $command->setLaravel($this->app);
+
+            $exitCode = $command->run(
+                new \Symfony\Component\Console\Input\ArrayInput(['--json' => true]),
+                new \Symfony\Component\Console\Output\BufferedOutput()
+            );
+
+            $this->assertSame(ScanFileIntegrityCommand::FAILURE, $exitCode);
+        } finally {
+            exec("rm -rf {$tempDir}");
+        }
+    }
+
+    public function test_no_disk_scan_option_skips_disk_scan(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/laravel-guardian-test-' . uniqid();
+        File::makeDirectory($tempDir, 0755, true);
+        exec("cd {$tempDir} && git init 2>/dev/null");
+
+        try {
+            $this->app->setBasePath($tempDir);
+            config()->set('file-integrity.disk_scan', ['local']);
+
+            $diskScanService = $this->createMock(DiskScanService::class);
+            $diskScanService->expects($this->never())->method('scanDisks');
+            $this->app->instance(DiskScanService::class, $diskScanService);
+
+            $gitDiffService = $this->createMock(GitDiffService::class);
+            $gitDiffService->method('runDiff')->willReturn('');
+            $gitDiffService->method('getUntrackedFiles')->willReturn([]);
+            $this->app->instance(GitDiffService::class, $gitDiffService);
+
+            $command = $this->app->make(ScanFileIntegrityCommand::class);
+            $command->setLaravel($this->app);
+
+            $command->run(
+                new \Symfony\Component\Console\Input\ArrayInput(['--json' => true, '--no-disk-scan' => true]),
+                new \Symfony\Component\Console\Output\BufferedOutput()
+            );
         } finally {
             exec("rm -rf {$tempDir}");
         }

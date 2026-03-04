@@ -64,6 +64,22 @@ Extra paths to skip (in addition to `.gitignore`). Supports glob patterns.
 
 When `true`, new files that exist on disk but are not yet committed (and not in `.gitignore`) are reported as "untracked". Default: `true`.
 
+### `disk_scan`
+
+Optionally scan one or more Laravel storage disks for security issues. Scans for:
+- **Suspicious PHP functions** (eval, exec, shell_exec, etc.) in PHP files
+- **Dangerous file extensions** (exe, php, sh, bash, etc.) that should not typically exist in upload storage
+
+Empty array = no disk scan. Example: `['local', 'public', 'uploads']`
+
+### `suspicious_php_functions`
+
+List of PHP functions considered dangerous when found in storage. Customize in config. Default includes: eval, exec, shell_exec, system, passthru, popen, proc_open, assert, create_function, unserialize.
+
+### `dangerous_extensions`
+
+File extensions that trigger an alert when found in storage. Default: exe, bat, cmd, com, sh, bash, php, php3, php4, php5, phtml, pl, py, cgi.
+
 ### `report`
 
 - **output**: `'console'`, `'json'`, or `'both'`
@@ -102,6 +118,20 @@ php artisan file-integrity:scan --paths=app --paths=routes --exclude-paths=app/C
 
 ```bash
 php artisan file-integrity:scan --no-fail
+```
+
+### Disk scan (storage security)
+
+Scan storage disks for suspicious PHP and dangerous file extensions (configure `disk_scan` in config, or override via CLI):
+
+```bash
+php artisan file-integrity:scan --disks=local --disks=uploads
+```
+
+Skip disk scan even when configured:
+
+```bash
+php artisan file-integrity:scan --no-disk-scan
 ```
 
 ## Scheduled Execution
@@ -148,6 +178,15 @@ To receive email notifications when changes are detected, enable the `report.mai
     "renamed": 0
   },
   "has_changes": true,
+  "disk_scan": {
+    "disks": ["local", "uploads"],
+    "findings": {
+      "suspicious_php": [{"disk": "uploads", "file": "shell.php", "functions": ["eval"]}],
+      "dangerous_files": [{"disk": "uploads", "file": "malware.exe", "extension": "exe"}]
+    },
+    "summary": {"suspicious_php_count": 1, "dangerous_files_count": 1},
+    "has_findings": true
+  },
   "exit_code": 1
 }
 ```
@@ -187,8 +226,9 @@ jobs:
 |----------|-------------|
 | `FILE_INTEGRITY_BASE_REF` | Override default base ref |
 | `FILE_INTEGRITY_INCLUDE_UNTRACKED` | `false` to skip untracked file detection |
+| `FILE_INTEGRITY_DISK_SCAN` | Comma-separated disk names to scan (e.g. `local,uploads`) |
 | `FILE_INTEGRITY_OUTPUT` | `console`, `json`, or `both` |
-| `FILE_INTEGRITY_FAIL_ON_CHANGES` | `true` to exit 1 on changes |
+| `FILE_INTEGRITY_FAIL_ON_CHANGES` | `true` to exit 1 on changes or disk findings |
 | `FILE_INTEGRITY_LOG` | `true` to log results |
 | `FILE_INTEGRITY_MAIL` | `true` to send mail report |
 | `FILE_INTEGRITY_MAIL_TO` | Comma-separated email addresses |
