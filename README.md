@@ -60,19 +60,6 @@ Extra paths to skip (in addition to `.gitignore`). Supports glob patterns.
 - **mail**: Send report via mail when changes detected
 - **mail_to**: Recipients for mail report
 
-### `severity_rules`
-
-Mark certain path patterns as "critical" for custom handling:
-
-```php
-'severity_rules' => [
-    'critical' => [
-        'public/**/*.php',
-        'config/**/*.php',
-    ],
-],
-```
-
 ## Usage
 
 ### Basic scan
@@ -104,6 +91,29 @@ php artisan file-integrity:scan --paths=app --paths=routes --exclude-paths=app/C
 ```bash
 php artisan file-integrity:scan --no-fail
 ```
+
+## Scheduled Execution
+
+It's recommended to run the command regularly (e.g. hourly) to detect unexpected file changes in time. Using Laravel Scheduler:
+
+**Laravel 11+** (`routes/console.php`):
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('file-integrity:scan')->hourly();
+```
+
+**Laravel 10** (`app/Console/Kernel.php`):
+
+```php
+protected function schedule(Schedule $schedule): void
+{
+    $schedule->command('file-integrity:scan')->hourly();
+}
+```
+
+To receive email notifications when changes are detected, enable the `report.mail` and `report.mail_to` options in the config.
 
 ## JSON Output Structure
 

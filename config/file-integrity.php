@@ -69,21 +69,4 @@ return [
         */
         'mail_to' => env('FILE_INTEGRITY_MAIL_TO', []),
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Severity Rules
-    |--------------------------------------------------------------------------
-    |
-    | Mark certain path patterns as "critical". Critical changes can trigger
-    | different behavior (e.g. always fail, special formatting).
-    | Keys are labels, values are glob patterns.
-    |
-    */
-    'severity_rules' => [
-        'critical' => [
-            'public/**/*.php',
-            'config/**/*.php',
-        ],
-    ],
 ];
