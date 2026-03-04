@@ -68,9 +68,16 @@ When `true`, new files that exist on disk but are not yet committed (and not in 
 
 Optionally scan one or more Laravel storage disks for security issues. Scans for:
 - **Suspicious PHP functions** (eval, exec, shell_exec, etc.) in PHP files
+- **Malware regex patterns** (obfuscated code, eval+base64_decode, etc.)
 - **Dangerous file extensions** (exe, php, sh, bash, etc.) that should not typically exist in upload storage
 
+Files under `content_scan_max_bytes` (default 200 KB) are read and checked for PHP content regardless of extension—detecting e.g. a `.webp` file that actually contains `<?php`. Files with dangerous extensions are not pattern-scanned (already flagged).
+
 Empty array = no disk scan. Example: `['local', 'public', 'uploads']`
+
+### `content_scan_max_bytes`
+
+Max file size (bytes) to read and scan for PHP content. Default: 204800 (200 KB). Larger files are skipped for content scan.
 
 ### `suspicious_php_functions`
 
@@ -227,6 +234,7 @@ jobs:
 | `FILE_INTEGRITY_BASE_REF` | Override default base ref |
 | `FILE_INTEGRITY_INCLUDE_UNTRACKED` | `false` to skip untracked file detection |
 | `FILE_INTEGRITY_DISK_SCAN` | Comma-separated disk names to scan (e.g. `local,uploads`) |
+| `FILE_INTEGRITY_CONTENT_SCAN_MAX_BYTES` | Max bytes to read per file for PHP content scan (default: 204800) |
 | `FILE_INTEGRITY_OUTPUT` | `console`, `json`, or `both` |
 | `FILE_INTEGRITY_FAIL_ON_CHANGES` | `true` to exit 1 on changes or disk findings |
 | `FILE_INTEGRITY_LOG` | `true` to log results |

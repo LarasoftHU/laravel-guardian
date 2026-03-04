@@ -62,6 +62,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Content Scan Max Size (bytes)
+    |--------------------------------------------------------------------------
+    |
+    | Only read and scan file content for files smaller than this size.
+    | Detects PHP disguised as other extensions (e.g. .webp containing <?php).
+    | Default: 200 KB.
+    |
+    */
+    'content_scan_max_bytes' => env('FILE_INTEGRITY_CONTENT_SCAN_MAX_BYTES', 200 * 1024),
+
+    /*
+    |--------------------------------------------------------------------------
     | Suspicious PHP Functions
     |--------------------------------------------------------------------------
     |
