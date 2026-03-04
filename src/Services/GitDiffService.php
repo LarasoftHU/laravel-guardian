@@ -33,6 +33,39 @@ class GitDiffService
         return $process->getOutput();
     }
 
+    /**
+     * Returns untracked files (new files not in Git, respecting .gitignore).
+     *
+     * @return string[] List of relative file paths
+     */
+    public function getUntrackedFiles(string $basePath): array
+    {
+        $this->lastError = null;
+
+        $process = new Process(
+            ['git', 'ls-files', '--others', '--exclude-standard'],
+            $basePath,
+            null,
+            null,
+            30
+        );
+
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            $this->lastError = trim($process->getErrorOutput() ?: $process->getOutput());
+
+            return [];
+        }
+
+        $output = trim($process->getOutput());
+        if ($output === '') {
+            return [];
+        }
+
+        return array_values(array_filter(explode("\n", $output)));
+    }
+
     public function getLastError(): ?string
     {
         return $this->lastError;

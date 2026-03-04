@@ -1,6 +1,6 @@
 # Laravel Guardian
 
-Laravel package for file integrity checking. Compares local files against the Git state (as stored locally), while respecting `.gitignore`. Ideal for CI/CD pipelines and deployment verification.
+Laravel package for file integrity checking. Compares local files against the Git state (as stored locally), while respecting `.gitignore`. Detects modified, added, deleted, renamed, and **untracked** files (new files not yet committed). Ideal for CI/CD pipelines and deployment verification.
 
 ## Requirements
 
@@ -59,6 +59,10 @@ Extra paths to skip (in addition to `.gitignore`). Supports glob patterns.
 ```php
 'exclude_paths' => ['vendor', 'node_modules', 'storage/logs/*'],
 ```
+
+### `include_untracked`
+
+When `true`, new files that exist on disk but are not yet committed (and not in `.gitignore`) are reported as "untracked". Default: `true`.
 
 ### `report`
 
@@ -132,13 +136,15 @@ To receive email notifications when changes are detected, enable the `report.mai
     "added": ["config/new.php"],
     "modified": ["app/Models/User.php"],
     "deleted": ["old/file.php"],
+    "untracked": ["app/NewFile.php"],
     "renamed": [{"from": "old.php", "to": "new.php"}]
   },
   "summary": {
-    "total": 3,
+    "total": 4,
     "added": 1,
     "modified": 1,
     "deleted": 1,
+    "untracked": 1,
     "renamed": 0
   },
   "has_changes": true,
@@ -180,6 +186,7 @@ jobs:
 | Variable | Description |
 |----------|-------------|
 | `FILE_INTEGRITY_BASE_REF` | Override default base ref |
+| `FILE_INTEGRITY_INCLUDE_UNTRACKED` | `false` to skip untracked file detection |
 | `FILE_INTEGRITY_OUTPUT` | `console`, `json`, or `both` |
 | `FILE_INTEGRITY_FAIL_ON_CHANGES` | `true` to exit 1 on changes |
 | `FILE_INTEGRITY_LOG` | `true` to log results |

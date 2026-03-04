@@ -52,6 +52,15 @@ class ScanFileIntegrityCommand extends Command
         }
 
         $changedFiles = $this->parseGitOutput($result);
+
+        $includeUntracked = config('file-integrity.include_untracked', true);
+        if ($includeUntracked) {
+            $untracked = $this->gitDiffService->getUntrackedFiles($basePath);
+            $changedFiles['untracked'] = $untracked;
+        } else {
+            $changedFiles['untracked'] = [];
+        }
+
         $changedFiles = $this->filterByPaths($changedFiles, $paths, $excludePaths);
 
         $summary = $this->buildSummary($changedFiles);
@@ -87,7 +96,7 @@ class ScanFileIntegrityCommand extends Command
     }
 
     /**
-     * @return array{added: string[], modified: string[], deleted: string[], renamed: array<int, array{from: string, to: string}>}
+     * @return array{added: string[], modified: string[], deleted: string[], renamed: array<int, array{from: string, to: string}>, untracked: string[]}
      */
     private function parseGitOutput(string $output): array
     {
@@ -96,6 +105,7 @@ class ScanFileIntegrityCommand extends Command
             'modified' => [],
             'deleted' => [],
             'renamed' => [],
+            'untracked' => [],
         ];
 
         $lines = array_filter(explode("\n", trim($output)));
@@ -128,10 +138,10 @@ class ScanFileIntegrityCommand extends Command
     }
 
     /**
-     * @param  array{added: string[], modified: string[], deleted: string[], renamed: array<int, array{from: string, to: string}>}  $changedFiles
+     * @param  array{added: string[], modified: string[], deleted: string[], renamed: array<int, array{from: string, to: string}>, untracked: string[]}  $changedFiles
      * @param  string[]  $paths
      * @param  string[]  $excludePaths
-     * @return array{added: string[], modified: string[], deleted: string[], renamed: array<int, array{from: string, to: string}>}
+     * @return array{added: string[], modified: string[], deleted: string[], renamed: array<int, array{from: string, to: string}>, untracked: string[]}
      */
     private function filterByPaths(array $changedFiles, array $paths, array $excludePaths): array
     {
@@ -161,6 +171,7 @@ class ScanFileIntegrityCommand extends Command
         $changedFiles['added'] = array_values(array_filter($changedFiles['added'], $filter));
         $changedFiles['modified'] = array_values(array_filter($changedFiles['modified'], $filter));
         $changedFiles['deleted'] = array_values(array_filter($changedFiles['deleted'], $filter));
+        $changedFiles['untracked'] = array_values(array_filter($changedFiles['untracked'] ?? [], $filter));
 
         $changedFiles['renamed'] = array_values(array_filter(
             $changedFiles['renamed'],
@@ -183,18 +194,20 @@ class ScanFileIntegrityCommand extends Command
     }
 
     /**
-     * @param  array{added: string[], modified: string[], deleted: string[], renamed: array<int, array{from: string, to: string}>}  $changedFiles
-     * @return array{total: int, added: int, modified: int, deleted: int, renamed: int}
+     * @param  array{added: string[], modified: string[], deleted: string[], renamed: array<int, array{from: string, to: string}>, untracked: string[]}  $changedFiles
+     * @return array{total: int, added: int, modified: int, deleted: int, renamed: int, untracked: int}
      */
     private function buildSummary(array $changedFiles): array
     {
+        $untracked = count($changedFiles['untracked'] ?? []);
         return [
             'total' => count($changedFiles['added']) + count($changedFiles['modified'])
-                + count($changedFiles['deleted']) + count($changedFiles['renamed']),
+                + count($changedFiles['deleted']) + count($changedFiles['renamed']) + $untracked,
             'added' => count($changedFiles['added']),
             'modified' => count($changedFiles['modified']),
             'deleted' => count($changedFiles['deleted']),
             'renamed' => count($changedFiles['renamed']),
+            'untracked' => $untracked,
         ];
     }
 
@@ -226,6 +239,9 @@ class ScanFileIntegrityCommand extends Command
         }
         foreach ($changedFiles['deleted'] as $file) {
             $rows[] = ['Deleted', $file, ''];
+        }
+        foreach ($changedFiles['untracked'] ?? [] as $file) {
+            $rows[] = ['Untracked', $file, ''];
         }
         foreach ($changedFiles['renamed'] as $pair) {
             $rows[] = ['Renamed', $pair['from'], '→ ' . $pair['to']];

@@ -40,6 +40,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Include Untracked Files
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, new files that exist on disk but are not yet committed
+    | (and not in .gitignore) will be reported as "untracked".
+    |
+    */
+    'include_untracked' => env('FILE_INTEGRITY_INCLUDE_UNTRACKED', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Report Configuration
     |--------------------------------------------------------------------------
     */

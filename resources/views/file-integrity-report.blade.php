@@ -14,6 +14,7 @@
         .status-added { color: #198754; }
         .status-modified { color: #fd7e14; }
         .status-deleted { color: #dc3545; }
+        .status-untracked { color: #6f42c1; }
         .status-renamed { color: #0d6efd; }
         .summary { background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
         .summary strong { display: inline-block; min-width: 5rem; }
@@ -28,6 +29,7 @@
         <strong>Added:</strong> {{ $report['summary']['added'] }} ·
         <strong>Modified:</strong> {{ $report['summary']['modified'] }} ·
         <strong>Deleted:</strong> {{ $report['summary']['deleted'] }} ·
+        <strong>Untracked:</strong> {{ $report['summary']['untracked'] ?? 0 }} ·
         <strong>Renamed:</strong> {{ $report['summary']['renamed'] }}
     </div>
 
@@ -49,6 +51,9 @@
             @endforeach
             @foreach($report['changed_files']['deleted'] ?? [] as $file)
             <tr><td class="status-deleted">Deleted</td><td colspan="2">{{ $file }}</td></tr>
+            @endforeach
+            @foreach($report['changed_files']['untracked'] ?? [] as $file)
+            <tr><td class="status-untracked">Untracked</td><td colspan="2">{{ $file }}</td></tr>
             @endforeach
             @foreach($report['changed_files']['renamed'] ?? [] as $pair)
             <tr><td class="status-renamed">Renamed</td><td>{{ $pair['from'] }}</td><td>→ {{ $pair['to'] }}</td></tr>

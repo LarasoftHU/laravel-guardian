@@ -37,4 +37,33 @@ class GitDiffServiceTest extends TestCase
 
         $this->assertIsString($result);
     }
+
+    public function test_get_untracked_files_returns_empty_in_valid_repo_with_no_untracked(): void
+    {
+        $basePath = base_path();
+        if (! is_dir($basePath . '/.git')) {
+            $this->markTestSkipped('Test requires a Git repository');
+        }
+
+        $service = new GitDiffService();
+        $untracked = $service->getUntrackedFiles($basePath);
+
+        $this->assertIsArray($untracked);
+    }
+
+    public function test_get_untracked_files_respects_gitignore(): void
+    {
+        $basePath = base_path();
+        if (! is_dir($basePath . '/.git')) {
+            $this->markTestSkipped('Test requires a Git repository');
+        }
+
+        $service = new GitDiffService();
+        $untracked = $service->getUntrackedFiles($basePath);
+
+        foreach ($untracked as $file) {
+            $this->assertStringNotContainsString('vendor/', $file);
+            $this->assertStringNotContainsString('node_modules/', $file);
+        }
+    }
 }

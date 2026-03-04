@@ -58,6 +58,7 @@ class ScanFileIntegrityCommandTest extends TestCase
 
             $gitDiffService = $this->createMock(GitDiffService::class);
             $gitDiffService->method('runDiff')->willReturn($sampleOutput);
+            $gitDiffService->method('getUntrackedFiles')->willReturn([]);
 
             $this->app->instance(GitDiffService::class, $gitDiffService);
 
@@ -88,6 +89,7 @@ class ScanFileIntegrityCommandTest extends TestCase
 
             $gitDiffService = $this->createMock(GitDiffService::class);
             $gitDiffService->method('runDiff')->willReturn("M\tapp/Test.php");
+            $gitDiffService->method('getUntrackedFiles')->willReturn([]);
 
             $this->app->instance(GitDiffService::class, $gitDiffService);
 
@@ -117,6 +119,7 @@ class ScanFileIntegrityCommandTest extends TestCase
 
             $gitDiffService = $this->createMock(GitDiffService::class);
             $gitDiffService->method('runDiff')->willReturn("M\tapp/Test.php");
+            $gitDiffService->method('getUntrackedFiles')->willReturn([]);
 
             $this->app->instance(GitDiffService::class, $gitDiffService);
 
@@ -129,6 +132,39 @@ class ScanFileIntegrityCommandTest extends TestCase
             );
 
             $this->assertSame(ScanFileIntegrityCommand::SUCCESS, $exitCode);
+        } finally {
+            exec("rm -rf {$tempDir}");
+        }
+    }
+
+    public function test_command_includes_untracked_files_in_report(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/laravel-guardian-test-' . uniqid();
+        File::makeDirectory($tempDir, 0755, true);
+        exec("cd {$tempDir} && git init 2>/dev/null");
+
+        try {
+            $this->app->setBasePath($tempDir);
+
+            $gitDiffService = $this->createMock(GitDiffService::class);
+            $gitDiffService->method('runDiff')->willReturn('');
+            $gitDiffService->method('getUntrackedFiles')->willReturn(['app/NewFile.php', 'config/extra.php']);
+
+            $this->app->instance(GitDiffService::class, $gitDiffService);
+
+            $command = $this->app->make(ScanFileIntegrityCommand::class);
+            $command->setLaravel($this->app);
+
+            $output = new \Symfony\Component\Console\Output\BufferedOutput();
+            $exitCode = $command->run(
+                new \Symfony\Component\Console\Input\ArrayInput(['--json' => true]),
+                $output
+            );
+
+            $report = json_decode($output->fetch(), true);
+            $this->assertSame(2, $report['summary']['untracked']);
+            $this->assertSame(['app/NewFile.php', 'config/extra.php'], $report['changed_files']['untracked']);
+            $this->assertSame(2, $report['summary']['total']);
         } finally {
             exec("rm -rf {$tempDir}");
         }
